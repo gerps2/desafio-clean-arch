@@ -1,4 +1,4 @@
-FROM golang:1.20-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 WORKDIR /app
 
@@ -23,22 +23,16 @@ WORKDIR /app
 COPY --from=builder /app/ordersystem .
 COPY --from=builder /app/migrations ./migrations
 
-# Install migrate tool
-RUN apk add --no-cache curl && \
+# Copy entrypoint script
+COPY entrypoint.sh /app/entrypoint.sh
+
+# Install migrate tool and netcat
+RUN apk add --no-cache curl netcat-openbsd && \
     curl -L https://github.com/golang-migrate/migrate/releases/download/v4.15.2/migrate.linux-amd64.tar.gz | tar xvz && \
     mv migrate /usr/local/bin/migrate && \
     chmod +x /usr/local/bin/migrate && \
+    chmod +x /app/entrypoint.sh && \
     apk del curl
-
-# Create entrypoint script
-RUN echo '#!/bin/sh\n\
-echo "Waiting for MySQL to start..."\n\
-sleep 10\n\
-echo "Running migrations..."\n\
-migrate -path=migrations -database="mysql://${DB_USER}:${DB_PASSWORD}@tcp(${DB_HOST}:${DB_PORT})/${DB_NAME}" -verbose up\n\
-echo "Starting application..."\n\
-./ordersystem\n' > /app/entrypoint.sh && \
-    chmod +x /app/entrypoint.sh
 
 EXPOSE 8000 50051 8080
 
